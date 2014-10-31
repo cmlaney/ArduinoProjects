@@ -1,0 +1,11 @@
+#ifndef ATTiny_sleep_h
+#define ATTiny_sleep_h
+
+#include "Arduino.h"
+
+class ATTiny_sleep {
+	public:
+		goToSleep(void);
+};
+
+#endif

@@ -1,0 +1,2 @@
+ATTiny_sleep KEYWORD1
+goToSleep KEYWORD2
