@@ -5,12 +5,12 @@
 #define FORWARD 1
 #define BACKWARD 0
 
-#define DRIVEMOTORLIMIT A6
+#define DRIVEMOTORLIMIT A5
 #define DRIVEMOTORCONTROLPIN 5
 #define DRIVEMOTORFORWARDCONTROLPIN 6
 #define DRIVEMOTORREVERSECONTROLPIN 7
 
-#define ROTATEMOTORLIMIT A7
+#define ROTATEMOTORLIMIT A4
 #define ROTATEMOTORCONTROLPIN 9
 #define ROTATEMOTORFORWARDCONTROLPIN A0
 #define ROTATEMOTORREVERSECONTROLPIN A1
@@ -52,7 +52,7 @@ void setup() {
 
   analogWrite(DRIVEMOTORCONTROLPIN, 180);
   analogWrite(SYRINGEMOTORCONTROLPIN, 180);
-  analogWrite(ROTATEMOTORCONTROLPIN, 180);
+  analogWrite(ROTATEMOTORCONTROLPIN, 100);
 
   pinMode(DRIVEMOTORFORWARDCONTROLPIN, OUTPUT);
   pinMode(DRIVEMOTORREVERSECONTROLPIN, OUTPUT);
@@ -119,10 +119,10 @@ void loop() {
       else if(cmd == 'd') 
       {
         int val = Serial.parseInt();
-        if(val == 1) {
+        if(val > 0) {
           Serial.println("Driving ball forward.");
           driveBall(FORWARD);
-        } else if (val == -1) {
+        } else if (val < 0) {
           Serial.println("Driving ball backward.");
           driveBall(BACKWARD);
         }
@@ -197,6 +197,7 @@ void rotateWheel(int dir) {
     delay(50);
     while(digitalRead(ROTATEMOTORLIMIT)) 
     {
+      digitalWrite(LED1, HIGH);
       if(millis()-rotateStart > rotateSafetyDelay) 
       {
         digitalWrite(ROTATEMOTORFORWARDCONTROLPIN, LOW);
@@ -206,6 +207,7 @@ void rotateWheel(int dir) {
       }
       delay(10);
     }
+    digitalWrite(LED1, LOW);
 
     digitalWrite(ROTATEMOTORFORWARDCONTROLPIN, LOW);
 
@@ -240,7 +242,7 @@ void rotateWheel(int dir) {
 void driveBall(int dir) {
 
   long driveStart = millis();
-  int driveSafetyDelay = 3000;
+  int driveSafetyDelay = 5000;
 
   if(dir == FORWARD) 
   {
@@ -258,7 +260,7 @@ void driveBall(int dir) {
       }
       delay(10);
     }
-    delay(500);
+    delay(300);
 
     digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, LOW);
 
@@ -267,7 +269,7 @@ void driveBall(int dir) {
     state = 4; 
   {  
     digitalWrite(DRIVEMOTORREVERSECONTROLPIN, HIGH);
-    delay(800);
+    delay(500);
 
     while(digitalRead(DRIVEMOTORLIMIT)) 
     {
@@ -311,7 +313,7 @@ void syringeReposition(int c) {
   if (c > 0) 
   {
     digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, HIGH);
-    while(millis()-start > (c*1000)) {
+    while(millis()-start < (c*1000)) {
       if(syringeAbsolute > SYRINGEABOLUTEMAX) {
         digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, LOW);
       }
@@ -322,7 +324,7 @@ void syringeReposition(int c) {
   else 
   {
     digitalWrite(SYRINGEMOTORREVERSECONTROLPIN, HIGH);
-    while(millis()-start > (c*(-1000))) {
+    while(millis()-start < (c*(-1000))) {
       if(syringeAbsolute < 0) {
         digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, LOW);
       }
