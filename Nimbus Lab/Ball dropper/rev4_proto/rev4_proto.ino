@@ -5,12 +5,12 @@
 #define FORWARD 1
 #define BACKWARD 0
 
-#define DRIVEMOTORLIMIT A7
+#define DRIVEMOTORLIMIT A6
 #define DRIVEMOTORCONTROLPIN 5
 #define DRIVEMOTORFORWARDCONTROLPIN 6
 #define DRIVEMOTORREVERSECONTROLPIN 7
 
-#define ROTATEMOTORLIMIT A6
+#define ROTATEMOTORLIMIT A7
 #define ROTATEMOTORCONTROLPIN 9
 #define ROTATEMOTORFORWARDCONTROLPIN A0
 #define ROTATEMOTORREVERSECONTROLPIN A1
@@ -19,8 +19,8 @@
 #define SYRINGEMOTORFORWARDCONTROLPIN 11
 #define SYRINGEMOTORREVERSECONTROLPIN 12
 #define INJECTIONDELAY 500
-#define SYRINGEENCODE1 2
-#define SYRINGEENCODE2 3
+#define SYRINGEENCODE1 3
+#define SYRINGEENCODE2 2
 #define SYRINGEABOLUTEMAX 1000
 
 #define LED1 A3
@@ -50,9 +50,9 @@ void setup() {
   pinMode(SYRINGEMOTORCONTROLPIN, OUTPUT);
   pinMode(ROTATEMOTORCONTROLPIN, OUTPUT);
 
-  digitalWrite(DRIVEMOTORCONTROLPIN, LOW);
-  digitalWrite(SYRINGEMOTORCONTROLPIN, LOW);
-  digitalWrite(ROTATEMOTORCONTROLPIN, LOW);
+  analogWrite(DRIVEMOTORCONTROLPIN, 180);
+  analogWrite(SYRINGEMOTORCONTROLPIN, 180);
+  analogWrite(ROTATEMOTORCONTROLPIN, 180);
 
   pinMode(DRIVEMOTORFORWARDCONTROLPIN, OUTPUT);
   pinMode(DRIVEMOTORREVERSECONTROLPIN, OUTPUT);
@@ -95,11 +95,10 @@ void setup() {
 void loop() {
   while(Serial.available()) {
     char cmd = Serial.read();
-    Serial.println(cmd);
       if(cmd == 'e') 
       {
         int val = Serial.parseInt();
-        Serial.print("Dropping "); Serial.print(val); Serial.println(" balls.\n"); 
+        Serial.print("Dropping "); Serial.print(val); Serial.println(" balls."); 
         if(val > 25) {
           val = 25;
         } 
@@ -109,11 +108,11 @@ void loop() {
       {
         int val = Serial.parseInt(); 
         if(val == 1) {
-          Serial.println("Rotating forward.\n");
+          Serial.println("Rotating forward.");
           rotateWheel(FORWARD);
         } 
         else if (val == -1) {
-          Serial.println("Rotating backward.\n");
+          Serial.println("Rotating backward.");
           rotateWheel(BACKWARD);
         } 
       }
@@ -121,17 +120,17 @@ void loop() {
       {
         int val = Serial.parseInt();
         if(val == 1) {
-          Serial.println("Driving ball forward.\n");
+          Serial.println("Driving ball forward.");
           driveBall(FORWARD);
         } else if (val == -1) {
-          Serial.println("Driving ball backward.\n");
+          Serial.println("Driving ball backward.");
           driveBall(BACKWARD);
         }
       }
       else if(cmd == 'i') {
         int val = Serial.parseInt();
         if(val == 0) {
-          Serial.println("Injecting ball.\n");
+          Serial.println("Injecting ball.");
           inject();
         } else {
           Serial.println("Repositioning syringe.");
@@ -145,8 +144,10 @@ void loop() {
         getState();
       }
       else {
-        Serial.println("Invalid command.\n");
+        Serial.println("Invalid command.");
       }
+      
+      Serial.println("Done, waiting for input.\n");
     
   }
 }
@@ -185,7 +186,9 @@ void execute(int count) {
 
 //function to rotate ball carrier
 void rotateWheel(int dir) {
+  
   if(dir > 0) {
+    digitalWrite(LED1, HIGH);
     state = 1;
     long rotateStart = millis();
     int rotateSafetyDelay = 1000;
@@ -212,6 +215,7 @@ void rotateWheel(int dir) {
       delay(10); 
     }
     digitalWrite(ROTATEMOTORREVERSECONTROLPIN, LOW);
+     digitalWrite(LED1, LOW); 
   } 
   else {
     digitalWrite(ROTATEMOTORREVERSECONTROLPIN, HIGH);
@@ -229,6 +233,7 @@ void rotateWheel(int dir) {
     }
     digitalWrite(ROTATEMOTORFORWARDCONTROLPIN, LOW);
   }
+  
 }
 
 //function to move ball forward/backward
@@ -241,7 +246,7 @@ void driveBall(int dir) {
   {
     state = 2;
     digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, HIGH);
-    delay(300);
+    delay(500);
 
     while(digitalRead(DRIVEMOTORLIMIT)) 
     {
@@ -253,7 +258,7 @@ void driveBall(int dir) {
       }
       delay(10);
     }
-    delay(300);
+    delay(500);
 
     digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, LOW);
 
@@ -262,7 +267,7 @@ void driveBall(int dir) {
     state = 4; 
   {  
     digitalWrite(DRIVEMOTORREVERSECONTROLPIN, HIGH);
-    delay(500);
+    delay(800);
 
     while(digitalRead(DRIVEMOTORLIMIT)) 
     {
@@ -341,8 +346,7 @@ void error(String s) {
 
 void getState() {
   Serial.print("State "); 
-  Serial.println(state); 
-  Serial.println("");
+  Serial.println(state);
 }
 
 void help() {
