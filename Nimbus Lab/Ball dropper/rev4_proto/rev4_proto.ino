@@ -27,7 +27,10 @@
 #define LED2 A2
 
 int dropCount = 0;
+boolean abortFlagInject = false;
+boolean abortFlagRetract = false;
 boolean abortFlag = false;
+
 
 boolean first = true;
 int state = 0;
@@ -94,6 +97,7 @@ void setup() {
 }
 
 void loop() {
+  reset();
   while(Serial.available()) {
     char cmd = Serial.read();
     if(cmd == 'e') 
@@ -139,6 +143,8 @@ void loop() {
       } 
       else {
         Serial.println("Repositioning syringe.");
+        if(val > 5) {val = 5;}
+        if(val < -5) {val = -5;}
         syringeReposition(val);
       }
     }
@@ -157,32 +163,53 @@ void loop() {
   }
 }
 
+void reset() {
+  digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, LOW);
+  digitalWrite(DRIVEMOTORREVERSECONTROLPIN, LOW);
+  digitalWrite(ROTATEMOTORFORWARDCONTROLPIN, LOW);
+  digitalWrite(ROTATEMOTORREVERSECONTROLPIN, LOW);
+  digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, LOW);
+  digitalWrite(SYRINGEMOTORREVERSECONTROLPIN, LOW);
+}
+
 void execute(int count) {
+  if(!abortFlag) {
   int i;
   for(i=0; i<count; i++) 
   {
     Serial.print("Preparing to drop ball: "); 
     Serial.println(++dropCount);
     digitalWrite(LED1, HIGH);
-    driveBall(1);
+    driveBall(FORWARD);
     digitalWrite(LED1, LOW);
     Serial.print("Injecting ball: "); 
     Serial.println(dropCount);
     digitalWrite(LED2, HIGH);
-    if(!abortFlag) {
+    if(!abortFlagInject) {
       inject();
     }
     digitalWrite(LED2, LOW);
-    driveBall(0);
     Serial.print("Retracting ball: "); 
     Serial.println(dropCount);
-    abortFlag = false;
+    driveBall(BACKWARD);
     delay(500);
     Serial.print("Dropping ball: "); 
     Serial.println(dropCount);
-    rotateWheel(1);
+    if(!abortFlagRetract) {
+      rotateWheel(1);
+      if(abortFlag) {
+        reset();
+        Serial.println("Wheel jammed, land now.");
+        return;
+      }
+    } else {
+      Serial.println("IT'S ON FIRE!");
+    }
   }
-
+  } else {
+    Serial.println("Wheel jammed, land now.");
+    return;
+  }
 }
 
 //###########################################################
@@ -199,7 +226,7 @@ void rotateWheel(int dir) {
     int rotateSafetyDelay = 1000;
 
     digitalWrite(ROTATEMOTORFORWARDCONTROLPIN, HIGH);
-    delay(50);
+    delay(300);
     while(digitalRead(ROTATEMOTORLIMIT)) 
     {
       digitalWrite(LED1, HIGH);
@@ -254,22 +281,28 @@ void driveBall(int dir) {
     state = 2;
     digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, HIGH);
     if(driveState) {
+      Serial.print("Backing off");
       while(!digitalRead(DRIVEMOTORLIMIT)) {
         delay(1);
+        
       }
+      Serial.println(" done looping");
     }
+    delay(10);
 
     while(digitalRead(DRIVEMOTORLIMIT)) 
     {
       if(millis()-driveStart > driveSafetyDelay) 
       {
-        abortFlag = true;
+        abortFlagInject = true;
         error("Ball can't drive forward.\n");
+        digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, LOW);
+        driveState = false;
         return;
       }
       delay(10);
     }
-    delay(300);
+    delay(500);
 
     digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, LOW);
     driveState = false;
@@ -283,12 +316,15 @@ void driveBall(int dir) {
         delay(1);
       }
     }
+    delay(10);
     while(digitalRead(DRIVEMOTORLIMIT)) 
     {
       if(millis()-driveStart > driveSafetyDelay) 
       {
-        abortFlag = true;
+        abortFlagRetract = true;
         error("Ball can't drive backward.\n");
+        digitalWrite(DRIVEMOTORREVERSECONTROLPIN, LOW);
+        driveState = true;
         return;
       }
       delay(10);
@@ -311,6 +347,7 @@ void inject() {
     if(millis()-injectStart > injectSafetyDelay) {
       abortFlag = true;
       error("Inject failed.\n");
+       digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, LOW);
       return;
     }
     delay(10);
@@ -362,9 +399,9 @@ void help() {
   Serial.println("--------------------------");
   Serial.println("e numOfBalls : Drops numOfBalls");
   Serial.println("r dir        : Rotates wheel forward if dir = 1,");
-  Serial.println("               backward if dir = 0");
+  Serial.println("               backward if dir = -1 WARNING: BACKWARD WILL BEND LIMIT SWITCH!");
   Serial.println("d dir        : Drives ball forward if dir = 1,");
-  Serial.println("               backward if dir = 0");
+  Serial.println("               backward if dir = -1");
   Serial.println("i seconds    : Injects ball if seconds = 0, repositions");
   Serial.println("               syringe forward or backward otherwise");
   Serial.println("h            : Prints command help");
