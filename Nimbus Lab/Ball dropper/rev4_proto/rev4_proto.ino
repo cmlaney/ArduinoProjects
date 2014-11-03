@@ -5,12 +5,12 @@
 #define FORWARD 1
 #define BACKWARD 0
 
-#define DRIVEMOTORLIMIT A5
+#define DRIVEMOTORLIMIT 4
 #define DRIVEMOTORCONTROLPIN 5
 #define DRIVEMOTORFORWARDCONTROLPIN 6
 #define DRIVEMOTORREVERSECONTROLPIN 7
 
-#define ROTATEMOTORLIMIT A4
+#define ROTATEMOTORLIMIT 8
 #define ROTATEMOTORCONTROLPIN 9
 #define ROTATEMOTORFORWARDCONTROLPIN A0
 #define ROTATEMOTORREVERSECONTROLPIN A1
@@ -18,7 +18,7 @@
 #define SYRINGEMOTORCONTROLPIN 10
 #define SYRINGEMOTORFORWARDCONTROLPIN 11
 #define SYRINGEMOTORREVERSECONTROLPIN 12
-#define INJECTIONDELAY 500
+#define INJECTIONDELAY 1750
 #define SYRINGEENCODE1 3
 #define SYRINGEENCODE2 2
 #define SYRINGEABOLUTEMAX 1000
@@ -31,6 +31,7 @@ boolean abortFlag = false;
 
 boolean first = true;
 int state = 0;
+boolean driveState = true;
 
 volatile int syringeAbsolute = 0;
 volatile int counterSyringe = 0;
@@ -52,7 +53,7 @@ void setup() {
 
   analogWrite(DRIVEMOTORCONTROLPIN, 180);
   analogWrite(SYRINGEMOTORCONTROLPIN, 180);
-  analogWrite(ROTATEMOTORCONTROLPIN, 100);
+  analogWrite(ROTATEMOTORCONTROLPIN, 90);
 
   pinMode(DRIVEMOTORFORWARDCONTROLPIN, OUTPUT);
   pinMode(DRIVEMOTORREVERSECONTROLPIN, OUTPUT);
@@ -95,60 +96,64 @@ void setup() {
 void loop() {
   while(Serial.available()) {
     char cmd = Serial.read();
-      if(cmd == 'e') 
-      {
-        int val = Serial.parseInt();
-        Serial.print("Dropping "); Serial.print(val); Serial.println(" balls."); 
-        if(val > 25) {
-          val = 25;
-        } 
-        execute(val); 
+    if(cmd == 'e') 
+    {
+      int val = Serial.parseInt();
+      Serial.print("Dropping "); 
+      Serial.print(val); 
+      Serial.println(" balls."); 
+      if(val > 25) {
+        val = 25;
+      } 
+      execute(val); 
+    }
+    else if(cmd == 'r') 
+    {
+      int val = Serial.parseInt(); 
+      if(val == 1) {
+        Serial.println("Rotating forward.");
+        rotateWheel(FORWARD);
+      } 
+      else if (val == -1) {
+        Serial.println("Rotating backward.");
+        rotateWheel(BACKWARD);
+      } 
+    }
+    else if(cmd == 'd') 
+    {
+      int val = Serial.parseInt();
+      if(val > 0) {
+        Serial.println("Driving ball forward.");
+        driveBall(FORWARD);
+      } 
+      else if (val < 0) {
+        Serial.println("Driving ball backward.");
+        driveBall(BACKWARD);
       }
-      else if(cmd == 'r') 
-      {
-        int val = Serial.parseInt(); 
-        if(val == 1) {
-          Serial.println("Rotating forward.");
-          rotateWheel(FORWARD);
-        } 
-        else if (val == -1) {
-          Serial.println("Rotating backward.");
-          rotateWheel(BACKWARD);
-        } 
-      }
-      else if(cmd == 'd') 
-      {
-        int val = Serial.parseInt();
-        if(val > 0) {
-          Serial.println("Driving ball forward.");
-          driveBall(FORWARD);
-        } else if (val < 0) {
-          Serial.println("Driving ball backward.");
-          driveBall(BACKWARD);
-        }
-      }
-      else if(cmd == 'i') {
-        int val = Serial.parseInt();
-        if(val == 0) {
-          Serial.println("Injecting ball.");
-          inject();
-        } else {
-          Serial.println("Repositioning syringe.");
-          syringeReposition(val);
-        }
-      }
-      else if(cmd == 'h') {
-        help();
-      }  
-      else if(cmd == 's') {
-        getState();
-      }
+    }
+    else if(cmd == 'i') {
+      int val = Serial.parseInt();
+      if(val == 0) {
+        Serial.println("Injecting ball.");
+        inject();
+      } 
       else {
-        Serial.println("Invalid command.");
+        Serial.println("Repositioning syringe.");
+        syringeReposition(val);
       }
-      
-      Serial.println("Done, waiting for input.\n");
-    
+    }
+    else if(cmd == 'h') {
+      help();
+    }  
+    else if(cmd == 's') {
+      getState();
+    }
+    else {
+      Serial.println("Invalid command.");
+    }
+
+    Serial.println("Done, waiting for input.\n");
+
   }
 }
 
@@ -186,7 +191,7 @@ void execute(int count) {
 
 //function to rotate ball carrier
 void rotateWheel(int dir) {
-  
+
   if(dir > 0) {
     digitalWrite(LED1, HIGH);
     state = 1;
@@ -217,7 +222,7 @@ void rotateWheel(int dir) {
       delay(10); 
     }
     digitalWrite(ROTATEMOTORREVERSECONTROLPIN, LOW);
-     digitalWrite(LED1, LOW); 
+    digitalWrite(LED1, LOW); 
   } 
   else {
     digitalWrite(ROTATEMOTORREVERSECONTROLPIN, HIGH);
@@ -235,7 +240,7 @@ void rotateWheel(int dir) {
     }
     digitalWrite(ROTATEMOTORFORWARDCONTROLPIN, LOW);
   }
-  
+
 }
 
 //function to move ball forward/backward
@@ -248,7 +253,11 @@ void driveBall(int dir) {
   {
     state = 2;
     digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, HIGH);
-    delay(500);
+    if(driveState) {
+      while(!digitalRead(DRIVEMOTORLIMIT)) {
+        delay(1);
+      }
+    }
 
     while(digitalRead(DRIVEMOTORLIMIT)) 
     {
@@ -263,14 +272,17 @@ void driveBall(int dir) {
     delay(300);
 
     digitalWrite(DRIVEMOTORFORWARDCONTROLPIN, LOW);
-
+    driveState = false;
   } 
   else if (dir == BACKWARD)
-    state = 4; 
   {  
+    state = 4; 
     digitalWrite(DRIVEMOTORREVERSECONTROLPIN, HIGH);
-    delay(500);
-
+    if(!driveState) {
+      while(!digitalRead(DRIVEMOTORLIMIT)) {
+        delay(1);
+      }
+    }
     while(digitalRead(DRIVEMOTORLIMIT)) 
     {
       if(millis()-driveStart > driveSafetyDelay) 
@@ -282,7 +294,9 @@ void driveBall(int dir) {
       delay(10);
     }
     digitalWrite(DRIVEMOTORREVERSECONTROLPIN, LOW);
+    driveState = true;
   }
+  
 }
 
 //function to inject fluid
@@ -308,28 +322,20 @@ void inject() {
 //Other Functions
 //###########################################################
 
+
+
 void syringeReposition(int c) {
   long start = millis();
   if (c > 0) 
   {
     digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, HIGH);
-    while(millis()-start < (c*1000)) {
-      if(syringeAbsolute > SYRINGEABOLUTEMAX) {
-        digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, LOW);
-      }
-      delay(10);
-    }
+    delay(c*1000);
     digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, LOW);
   } 
   else 
   {
     digitalWrite(SYRINGEMOTORREVERSECONTROLPIN, HIGH);
-    while(millis()-start < (c*(-1000))) {
-      if(syringeAbsolute < 0) {
-        digitalWrite(SYRINGEMOTORFORWARDCONTROLPIN, LOW);
-      }
-      delay(10);
-    }
+    delay(c*(-1000));
     digitalWrite(SYRINGEMOTORREVERSECONTROLPIN, LOW);
   }
 }
@@ -404,6 +410,7 @@ int getState(int A, int B) {
     }
   }
 }
+
 
 
 
